@@ -43,4 +43,3 @@ print("Chat server is listening on port " + str(port))
 while True:
     (clnt_sock, clnt_addr) = serv_sock.accept()
     print("Connected to " + str(clnt_addr))
-    clnt_sock.close()
