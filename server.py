@@ -1,7 +1,15 @@
 #!/usr/bin/python
+import signal
 import socket
 import string
 import sys
+
+# Ensure graceful exit on CTRL+C
+def quit(sig_num, status):
+    print("\nServer terminated.")
+    exit(0)
+
+signal.signal(signal.SIGINT, quit)
 
 try:
     port = int(sys.argv[1])
