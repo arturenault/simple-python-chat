@@ -37,9 +37,31 @@ serv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 # Bind to local host with specified port
 serv_sock.bind(("", port))
 
+# Create dictionary for socket storage
+sockets = dict()
+
 # Set socket to listen
 status = serv_sock.listen(5)
 print("Chat server is listening on port " + str(port))
 while True:
     (clnt_sock, clnt_addr) = serv_sock.accept()
+
     print("Connected to " + str(clnt_addr))
+
+    # Prompts for username and password
+    clnt_sock.send("Username: ")
+    username = clnt_sock.recv(4096)
+    clnt_sock.send("Password: ")
+    password = clnt_sock.recv(4096)
+
+    try:
+        if passwords[username] == password:
+            # Correct user; add him/her
+            sockets[username] = clnt_sock
+            clnt_sock.send("Welcome to EasyChat!\n")
+        else:
+            clnt_sock.send("Wrong password.\n")
+    except KeyError:
+        clnt_sock.send("Wrong username\n")
+
+    clnt_sock.close()

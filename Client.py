@@ -17,7 +17,15 @@ sock = socket.socket()
 
 try:
     sock.connect((serv_addr, serv_port))
-    sock.close()
+
+    # Send username after server prompt
+    sock.send(raw_input(sock.recv(4096)))
+
+    # Send password after server prompt
+    sock.send(raw_input(sock.recv(4096)))
+
+    # Receive welcome message or rejection
+    print(sock.recv(4096))
 except socket.error:
     sock.close()
     exit("Connection failed.")
