@@ -63,19 +63,17 @@ while True:
                 loggedin = True
                 # Correct user; add him/her
                 sockets[username] = clnt_sock
-                clnt_sock.send("Welcome to EasyChat!\n")
+                clnt_sock.send("JOIN\nWelcome to EasyChat!\n")
             else:
                 attempts += 1
                 if attempts < 3:
-                    clnt_sock.send("Wrong password.\n")
+                    clnt_sock.send("WRONG\nWrong password.\n")
                 else:
-                    clnt_sock.send("Too many wrong attempts. Blocked.\n")
+                    clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.\n")
         except KeyError:
             attempts += 1
             if attempts < 3:
-                clnt_sock.send("Wrong password.\n")
+                clnt_sock.send("WRONG\nWrong password.\n")
             else:
-                clnt_sock.send("Too many wrong attempts. Blocked.\n")
+                clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.\n")
         time.sleep(1)
-    clnt_sock.shutdown(socket.SHUT_RDWR)
-    clnt_sock.close()

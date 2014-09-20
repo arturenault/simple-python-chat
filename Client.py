@@ -26,7 +26,16 @@ try:
         sock.send(raw_input(sock.recv(4096)))
 
         # Receive welcome message or rejection
-        print(sock.recv(4096))
+        response = sock.recv(4096).split("\n")
+        print(response[1])
+
+        if response[0] == "JOIN":
+            break
+        elif response[0] == "WRONG":
+            continue
+        elif response[0] == "BLOCK":
+            sock.close()
+            exit(1)
 except socket.error:
     sock.close()
     exit("Connection failed.")
