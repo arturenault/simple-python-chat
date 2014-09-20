@@ -3,6 +3,7 @@ import signal
 import socket
 import string
 import sys
+import time
 
 # Ensure graceful exit on CTRL+C
 def quit(sig_num, status):
@@ -48,20 +49,33 @@ while True:
 
     print("Connected to " + str(clnt_addr))
 
-    # Prompts for username and password
-    clnt_sock.send("Username: ")
-    username = clnt_sock.recv(4096)
-    clnt_sock.send("Password: ")
-    password = clnt_sock.recv(4096)
+    attempts = 0
+    loggedin = False
+    while not loggedin and attempts < 3:
+        # Prompts for username and password
+        clnt_sock.send("Username: ")
+        username = clnt_sock.recv(4096)
+        clnt_sock.send("Password: ")
+        password = clnt_sock.recv(4096)
 
-    try:
-        if passwords[username] == password:
-            # Correct user; add him/her
-            sockets[username] = clnt_sock
-            clnt_sock.send("Welcome to EasyChat!\n")
-        else:
-            clnt_sock.send("Wrong password.\n")
-    except KeyError:
-        clnt_sock.send("Wrong username\n")
-
+        try:
+            if passwords[username] == password:
+                loggedin = True
+                # Correct user; add him/her
+                sockets[username] = clnt_sock
+                clnt_sock.send("Welcome to EasyChat!\n")
+            else:
+                attempts += 1
+                if attempts < 3:
+                    clnt_sock.send("Wrong password.\n")
+                else:
+                    clnt_sock.send("Too many wrong attempts. Blocked.\n")
+        except KeyError:
+            attempts += 1
+            if attempts < 3:
+                clnt_sock.send("Wrong password.\n")
+            else:
+                clnt_sock.send("Too many wrong attempts. Blocked.\n")
+        time.sleep(1)
+    clnt_sock.shutdown(socket.SHUT_RDWR)
     clnt_sock.close()
