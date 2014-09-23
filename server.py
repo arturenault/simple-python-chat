@@ -39,41 +39,43 @@ serv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 serv_sock.bind(("", port))
 
 # Create dictionary for socket storage
-sockets = dict()
+users = dict()
+
+# Create dictionary for attempt tracking
+attempts = dict()
+
+# Create dictionary for blocked users
+blocked = []
 
 # Set socket to listen
 status = serv_sock.listen(5)
 print("Chat server is listening on port " + str(port))
 while True:
     (clnt_sock, clnt_addr) = serv_sock.accept()
+    clnt_ip = clnt_addr[0]
 
-    print("Connected to " + str(clnt_addr))
+    print("Connection from " + str(clnt_addr))
 
-    attempts = 0
-    loggedin = False
-    while not loggedin and attempts < 3:
-        # Prompts for username and password
-        clnt_sock.send("Username: ")
-        username = clnt_sock.recv(4096)
-        clnt_sock.send("Password: ")
-        password = clnt_sock.recv(4096)
-
-        try:
-            if passwords[username] == password:
-                loggedin = True
-                # Correct user; add him/her
-                sockets[username] = clnt_sock
-                clnt_sock.send("JOIN\nWelcome to EasyChat!\n")
+    if str(clnt_addr) not in users and str(clnt_addr) not in blocked:
+        clnt_sock.send("AUTHENTICATE\n");
+        response = clnt_sock.recv(4096).split("\n")
+        if response[0] == "AUTHENTICATE":
+            username, password = response[1].split(" ")
+            if username in passwords and passwords[username] == password:
+                users[username] = clnt_sock
+                attempts[clnt_ip] = 0
+                clnt_sock.send("JOIN\nWelcome to EasyChat!")
             else:
-                attempts += 1
-                if attempts < 3:
-                    clnt_sock.send("WRONG\nWrong password.\n")
+                if clnt_ip in attempts:
+                    attempts[clnt_ip] += 1
                 else:
-                    clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.\n")
-        except KeyError:
-            attempts += 1
-            if attempts < 3:
-                clnt_sock.send("WRONG\nWrong password.\n")
-            else:
-                clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.\n")
-        time.sleep(1)
+                    attempts[clnt_ip] = 1
+
+                if attempts[clnt_ip] >= 3:
+                    blocked.append(clnt_ip)
+                    attempts[clnt_ip] = 0
+                    clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.")
+                else:
+                    clnt_sock.send("WRONG\nWrong password.")
+        else:
+            clnt_sock.send("ERROR\nWrong protocol.")
