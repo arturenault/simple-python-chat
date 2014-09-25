@@ -15,7 +15,7 @@ def quit(sig_num, status):
 def owner(s):
     return users.keys()[users.values().index(s)]
 
-def send_to_all(sock, message):
+def broadcast(sock, message):
     for x in users:
         if users[x] is not sock:
             try:
@@ -103,12 +103,25 @@ while True:
         ready, spam, eggs = select.select(users.values(),[],[],0)
         for sock in ready:
             try:
-                message = sock.recv(4096)
-                if message:
+                data = sock.recv(4096)
+                if data:
                     username = users.keys()[users.values().index(sock)]
-                    neat_message = "\n" + username + ": " + message.strip()
-                    sys.stdout.write(neat_message)
-                    send_to_all(sock, neat_message)
+                    command, message = data.strip().split(" ", 1)
+                    if command == "broadcast":
+                        neat_message = "\n" + username + ": " + message
+                        broadcast(sock, neat_message)
+                    elif command == "message":
+                        user, message = message.split(" ", 1)
+                        try:
+                            users[user].send("\n" + username + ": " + message)
+                        except KeyError:
+                            sock.send("\nThat user is not logged in.")
+                        except socket.error:
+                            sock.send("\nThat user is not available.")
+                            users[user].close()
+                            users.pop(user)
+                    else:
+                        sock.send("\nCommand not recognized.")
             except socket.error:
                 sock.close()
                 users.pop(owner(sock))
