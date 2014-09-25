@@ -1,6 +1,13 @@
 #!/usr/bin/env python
-import sys
+
+import select
 import socket
+import sys
+
+
+def wait_for_input():
+    sys.stdout.write("> ")
+    sys.stdout.flush()
 
 # Get address and port from command line
 try:
@@ -44,6 +51,25 @@ try:
         elif response[0] == "BLOCK":
             sock.close()
             exit(response[1])
+
+    # If you get here, you are logged in.
+    wait_for_input()
+
+    while True:
+        new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
+
+        if new_messages:
+            for source in new_messages:
+                if source is sock:
+                    messages = sock.recv(4096)
+                    if messages:
+                        print(messages)
+                        wait_for_input()
+                else:
+                    message = sys.stdin.readline()
+                    sock.send(message)
+                    wait_for_input()
+
 except socket.error:
     sock.close()
     exit("Connection failed.")

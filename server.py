@@ -11,6 +11,14 @@ def quit(sig_num, status):
     print("\nServer terminated.")
     exit(0)
 
+def send_to_all(sock, message):
+    for x in users:
+        if users[x] is not sock:
+            try:
+                users[x].send(message)
+            except socket.error:
+                users[x].close()
+                users.remove(user)
 
 signal.signal(signal.SIGINT, quit)
 
@@ -49,7 +57,7 @@ users = dict()
 # Create dictionary for attempt tracking
 attempts = dict()
 
-# Create dictionary for blocked users
+# Create list for blocked users
 blocked = []
 
 # Set socket to listen
@@ -63,7 +71,7 @@ while True:
 
         print("Connection from " + str(clnt_addr))
 
-        if str(clnt_addr) not in users and str(clnt_addr) not in blocked:
+        if str(clnt_addr) not in blocked:
             clnt_sock.send("AUTHENTICATE\n");
             response = clnt_sock.recv(4096).split("\n")
             if response[0] == "AUTHENTICATE":
@@ -87,4 +95,11 @@ while True:
             else:
                 clnt_sock.send("ERROR\nWrong protocol.")
     except socket.error:
-       pass # TODO: handle messages
+        ready, spam, eggs = select.select(users.values(),[],[],0)
+        for sock in ready:
+            message = sock.recv(4096)
+            if message:
+                username = users.keys()[users.values().index(sock)]
+                neat_message = "\n" + username + ": " + message.strip()
+                sys.stdout.write(neat_message)
+                send_to_all(sock, neat_message)
