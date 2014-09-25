@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import select
 import signal
 import socket
 import string
@@ -9,6 +10,7 @@ import time
 def quit(sig_num, status):
     print("\nServer terminated.")
     exit(0)
+
 
 signal.signal(signal.SIGINT, quit)
 
@@ -32,6 +34,9 @@ for line in user_file:
 # AF_INET and SOCK_STREAM, which are what we want.
 serv_sock = socket.socket()
 
+# Make socket non-blocking so it doesn't just wait for new connections.
+serv_sock.setblocking(0)
+
 # Make reusing addresses possible
 serv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -51,31 +56,35 @@ blocked = []
 status = serv_sock.listen(5)
 print("Chat server is listening on port " + str(port))
 while True:
-    (clnt_sock, clnt_addr) = serv_sock.accept()
-    clnt_ip = clnt_addr[0]
+    try:
+        (clnt_sock, clnt_addr) = serv_sock.accept()
+        clnt_sock.settimeout(0.1)
+        clnt_ip = clnt_addr[0]
 
-    print("Connection from " + str(clnt_addr))
+        print("Connection from " + str(clnt_addr))
 
-    if str(clnt_addr) not in users and str(clnt_addr) not in blocked:
-        clnt_sock.send("AUTHENTICATE\n");
-        response = clnt_sock.recv(4096).split("\n")
-        if response[0] == "AUTHENTICATE":
-            username, password = response[1].split(" ")
-            if username in passwords and passwords[username] == password:
-                users[username] = clnt_sock
-                attempts[clnt_ip] = 0
-                clnt_sock.send("JOIN\nWelcome to EasyChat!")
-            else:
-                if clnt_ip in attempts:
-                    attempts[clnt_ip] += 1
-                else:
-                    attempts[clnt_ip] = 1
-
-                if attempts[clnt_ip] >= 3:
-                    blocked.append(clnt_ip)
+        if str(clnt_addr) not in users and str(clnt_addr) not in blocked:
+            clnt_sock.send("AUTHENTICATE\n");
+            response = clnt_sock.recv(4096).split("\n")
+            if response[0] == "AUTHENTICATE":
+                username, password = response[1].split(" ")
+                if username in passwords and passwords[username] == password:
+                    users[username] = clnt_sock
                     attempts[clnt_ip] = 0
-                    clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.")
+                    clnt_sock.send("JOIN\nWelcome to EasyChat!")
                 else:
-                    clnt_sock.send("WRONG\nWrong password.")
-        else:
-            clnt_sock.send("ERROR\nWrong protocol.")
+                    if clnt_ip in attempts:
+                        attempts[clnt_ip] += 1
+                    else:
+                        attempts[clnt_ip] = 1
+
+                    if attempts[clnt_ip] >= 3:
+                        blocked.append(clnt_ip)
+                        attempts[clnt_ip] = 0
+                        clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.")
+                    else:
+                        clnt_sock.send("WRONG\nWrong password.")
+            else:
+                clnt_sock.send("ERROR\nWrong protocol.")
+    except socket.error:
+       pass # TODO: handle messages
