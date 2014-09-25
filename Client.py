@@ -61,9 +61,8 @@ try:
             exit(response[1])
 
     # If you get here, you are logged in.
-    wait_for_input()
-
     while True:
+        wait_for_input()
         new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
 
         if new_messages:
@@ -72,11 +71,9 @@ try:
                     messages = sock.recv(4096)
                     if messages:
                         print(messages)
-                        wait_for_input()
                 else:
                     message = sys.stdin.readline()
                     sock.send(message)
-                    wait_for_input()
 
 except socket.error:
     sock.close()

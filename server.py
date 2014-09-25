@@ -106,7 +106,10 @@ while True:
                 data = sock.recv(4096)
                 if data:
                     username = users.keys()[users.values().index(sock)]
-                    command, message = data.strip().split(" ", 1)
+                    l = data.strip().split(" ", 1)
+                    command = l[0]
+                    if len(l) > 1:
+                        message = l[1]
                     if command == "broadcast":
                         neat_message = "\n" + username + ": " + message
                         broadcast(sock, neat_message)
@@ -120,6 +123,12 @@ while True:
                             sock.send("\nThat user is not available.")
                             users[user].close()
                             users.pop(user)
+                    elif command == "whoelse":
+                        response = "\nLogged in:"
+                        for key in users.keys():
+                            if key != owner(sock):
+                                response += "\n" + key
+                        sock.send(response)
                     else:
                         sock.send("\nCommand not recognized.")
             except socket.error:
