@@ -11,6 +11,10 @@ def quit(sig_num, status):
     print("\nServer terminated.")
     exit(0)
 
+# Find user from socket
+def owner(s):
+    return users.keys()[users.values().index(s)]
+
 def send_to_all(sock, message):
     for x in users:
         if users[x] is not sock:
@@ -21,6 +25,7 @@ def send_to_all(sock, message):
                 users.remove(user)
 
 signal.signal(signal.SIGINT, quit)
+
 
 try:
     port = int(sys.argv[1])
@@ -97,9 +102,14 @@ while True:
     except socket.error:
         ready, spam, eggs = select.select(users.values(),[],[],0)
         for sock in ready:
-            message = sock.recv(4096)
-            if message:
-                username = users.keys()[users.values().index(sock)]
-                neat_message = "\n" + username + ": " + message.strip()
-                sys.stdout.write(neat_message)
-                send_to_all(sock, neat_message)
+            try:
+                message = sock.recv(4096)
+                if message:
+                    username = users.keys()[users.values().index(sock)]
+                    neat_message = "\n" + username + ": " + message.strip()
+                    sys.stdout.write(neat_message)
+                    send_to_all(sock, neat_message)
+            except socket.error:
+                sock.close()
+                users.pop(owner(sock))
+

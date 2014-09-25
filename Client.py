@@ -1,9 +1,15 @@
 #!/usr/bin/env python
 
 import select
+import signal
 import socket
 import sys
 
+
+def quit(sig_num, status):
+    print("\n You have quit the chat.")
+    sock.close()
+    exit(0)
 
 def wait_for_input():
     sys.stdout.write("> ")
@@ -15,6 +21,8 @@ try:
     serv_port = int(sys.argv[2])
 except IndexError, TypeError:
     exit("usage: ./Client.py <server_host> <server_port>")
+
+signal.signal(signal.SIGINT, quit)
 
 try:
     while True:
