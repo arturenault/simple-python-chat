@@ -62,19 +62,22 @@ try:
 
     # If you get here, you are logged in.
     while True:
-        wait_for_input()
-        new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
+        try:
+            wait_for_input()
+            new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
 
-        if new_messages:
-            for source in new_messages:
-                if source is sock:
-                    messages = sock.recv(4096)
-                    if messages:
-                        print(messages)
-                else:
-                    message = sys.stdin.readline()
-                    sock.send(message)
-
+            if new_messages:
+                for source in new_messages:
+                    if source is sock:
+                        messages = sock.recv(4096)
+                        if messages:
+                            print(messages)
+                    else:
+                        message = sys.stdin.readline()
+                        sock.send(message)
+        except socket.error:
+            sock.close()
+            exit("Server error.")
 except socket.error:
     sock.close()
     exit("Connection failed.")

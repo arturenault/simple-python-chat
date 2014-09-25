@@ -80,11 +80,14 @@ while True:
             clnt_sock.send("AUTHENTICATE\n");
             response = clnt_sock.recv(4096).split("\n")
             if response[0] == "AUTHENTICATE":
-                username, password = response[1].split(" ")
+                username, password = response[1].strip().split(" ")
                 if username in passwords and passwords[username] == password:
-                    users[username] = clnt_sock
-                    attempts[clnt_ip] = 0
-                    clnt_sock.send("JOIN\nWelcome to EasyChat!")
+                    if username not in users:
+                        users[username] = clnt_sock
+                        attempts[clnt_ip] = 0
+                        clnt_sock.send("JOIN\nWelcome to EasyChat!")
+                    else:
+                        clnt_sock.send("WRONG\n")
                 else:
                     if clnt_ip in attempts:
                         attempts[clnt_ip] += 1
@@ -106,7 +109,7 @@ while True:
                 data = sock.recv(4096)
                 if data:
                     username = users.keys()[users.values().index(sock)]
-                    l = data.strip().split(" ", 1)
+                    l = data.strip("\n").split(" ", 1)
                     command = l[0]
                     if len(l) > 1:
                         message = l[1]
