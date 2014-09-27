@@ -81,4 +81,6 @@ if __name__ == "__main__":
                         exit("Server error.")
                 else:
                     message = sys.stdin.readline()
+                    if message.split()[0] == "logout":
+                        quit(0, 0)
                     sock.send(message)

@@ -28,34 +28,36 @@ def quit(sig_num, status):
 def owner(s):
     return users.keys()[users.values().index(s)]
 
+
 def authenticate(client, address):
     ip = address[0]
     if ip not in blocked:
-            client.send("AUTHENTICATE\n");
-            response = client.recv(4096).split("\n")
-            if response[0] == "AUTHENTICATE":
-                username, password = response[1].strip().split(" ")
-                if username in passwords and passwords[username] == password:
-                    if username not in users:
-                        users[username] = client
-                        attempts[ip] = 0
-                        client.send("JOIN\nWelcome to EasyChat!")
-                    else:
-                        client.send("WRONG\n")
+        client.send("AUTHENTICATE\n");
+        response = client.recv(4096).split("\n")
+        if response[0] == "AUTHENTICATE":
+            username, password = response[1].strip().split(" ")
+            if username in passwords and passwords[username] == password:
+                if username not in users:
+                    users[username] = client
+                    attempts[ip] = 0
+                    client.send("JOIN\nWelcome to EasyChat!")
                 else:
-                    if ip in attempts:
-                        attempts[ip] += 1
-                    else:
-                        attempts[ip] = 1
-
-                    if attempts[ip] >= 3:
-                        blocked.append(ip)
-                        attempts[ip] = 0
-                        clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.")
-                    else:
-                        clnt_sock.send("WRONG\nWrong password.")
+                    client.send("WRONG\n")
             else:
-                clnt_sock.send("ERROR\nWrong protocol.")
+                if ip in attempts:
+                    attempts[ip] += 1
+                else:
+                    attempts[ip] = 1
+
+                if attempts[ip] >= 3:
+                    blocked.append(ip)
+                    attempts[ip] = 0
+                    clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.")
+                else:
+                    clnt_sock.send("WRONG\nWrong password.")
+        else:
+            clnt_sock.send("ERROR\nWrong protocol.")
+
 
 # Send message to all users
 def broadcast(source, text):
@@ -135,7 +137,7 @@ if __name__ == "__main__":
                         command = l[0]
 
                         # Handle the case where it's there's also a message,
-                        #  not just a command.
+                        # not just a command.
                         if len(l) > 1:
                             text = l[1]
 
@@ -154,6 +156,12 @@ if __name__ == "__main__":
                             sock.send(response)
                         else:
                             sock.send("\nCommand not recognized.")
+                    else:
+                        # If we get here, client is dead. Log him out.
+                        sock.close()
+                        users.pop(owner(sock))
+
+
                 except socket.error:
                     sock.close()
                     users.pop(owner(sock))
