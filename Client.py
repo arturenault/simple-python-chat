@@ -36,7 +36,6 @@ if __name__ == "__main__":
         # we want.
         sock = socket.socket()
 
-
         # Prompt user for info on startup
         username = raw_input("Username: ")
         password = raw_input("Password: ")
@@ -69,19 +68,17 @@ if __name__ == "__main__":
 
     # If you get here, you are logged in.
     while True:
-        try:
-            wait_for_input()
-            new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
+        wait_for_input()
+        new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
 
-            if new_messages:
-                for source in new_messages:
-                    if source is sock:
-                        messages = sock.recv(4096)
-                        if messages:
-                            print(messages)
+        if new_messages:
+            for source in new_messages:
+                if source is sock:
+                    messages = sock.recv(4096)
+                    if messages:
+                        print(messages)
                     else:
-                        message = sys.stdin.readline()
-                        sock.send(message)
-        except socket.error:
-            sock.close()
-            exit("Server error.")
+                        exit("Server error.")
+                else:
+                    message = sys.stdin.readline()
+                    sock.send(message)
