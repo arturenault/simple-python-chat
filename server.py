@@ -1,10 +1,12 @@
 #!/usr/bin/env python
+import datetime
 import select
 import signal
 import socket
 import string
 import sys
-import time
+
+LAST_HOUR = datetime.timedelta(hours=1)
 
 # Create dictionary for usernames and passwords
 passwords = dict()
@@ -14,6 +16,9 @@ users = dict()
 
 # Create dictionary for attempt tracking
 attempts = dict()
+
+# Keeps track of last time user logged out
+last_activity = dict()
 
 # Create list for blocked users
 blocked = []
@@ -41,6 +46,7 @@ def authenticate(client, address):
                     users[username] = client
                     attempts[ip] = 0
                     client.send("JOIN\nWelcome to EasyChat!")
+                    last_activity[username] = datetime.datetime.now()
                 else:
                     client.send("WRONG\n")
             else:
@@ -61,7 +67,7 @@ def authenticate(client, address):
 
 # Send message to all users
 def broadcast(source, text):
-    text = "\n" + username + ": " + text
+    text = "\n" + sender + ": " + text
     for u in users:
         if users[u] is not source:
             try:
@@ -74,7 +80,7 @@ def broadcast(source, text):
 # Send private message
 def message(source, destination, text):
     try:
-        users[destination].send("\n(private)" + username + ": " + text)
+        users[destination].send("\n(private)" + sender + ": " + text)
     except KeyError:
         source.send("\nThat user is not logged in.")
     except socket.error:
@@ -99,6 +105,7 @@ if __name__ == "__main__":
     for line in user_file:
         user = string.split(line)
         passwords[user[0]] = user[1]
+        last_activity[user[0]] = datetime.datetime.min
 
     # Create socket
     # No parameters needed because Python defaults to
@@ -126,13 +133,16 @@ if __name__ == "__main__":
                 clnt_sock.settimeout(0.1)
                 print("Connection from " + str(clnt_addr))
                 authenticate(clnt_sock, clnt_addr)
-
             else:
                 try:
                     # Handle new messages
                     data = sock.recv(4096)
                     if data:
-                        username = users.keys()[users.values().index(sock)]
+                        sender = owner(sock)
+
+                        # Update last activity for the user
+                        last_activity[sender] = datetime.datetime.now()
+
                         l = data.strip("\n").split(" ", 1)
                         command = l[0]
 
@@ -151,17 +161,27 @@ if __name__ == "__main__":
                         elif command == "whoelse":
                             response = "\nLogged in:"
                             for key in users.keys():
-                                if key != owner(sock):
+                                if key != sender:
                                     response += "\n" + key
                             sock.send(response)
+
+                        elif command == "wholasthr":
+                            response = "\nActive in the last hour:"
+                            for key in last_activity:
+                                time_since = datetime.datetime.now() - last_activity[key]
+                                if time_since < LAST_HOUR and key != sender:
+                                    response += "\n" + key + " (at " + str(last_activity[key].time())[:5] + ")"
+                            sock.send(response)
+
                         else:
                             sock.send("\nCommand not recognized.")
+
                     else:
                         # If we get here, client is dead. Log him out.
                         sock.close()
                         users.pop(owner(sock))
 
-
                 except socket.error:
+                    last_activity[owner(sock)] = datetime.datetime.now()
                     sock.close()
                     users.pop(owner(sock))
