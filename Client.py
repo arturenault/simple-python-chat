@@ -6,25 +6,29 @@ import socket
 import sys
 
 
+# Exit gracefully
 def quit(sig_num, status):
-    print("\n You have quit the chat.")
+    print("\nYou have quit the chat.")
     sock.close()
     exit(0)
 
+
+# Wait for input from user
 def wait_for_input():
     sys.stdout.write("> ")
     sys.stdout.flush()
 
-# Get address and port from command line
-try:
-    serv_addr = socket.gethostbyname(sys.argv[1])
-    serv_port = int(sys.argv[2])
-except IndexError, TypeError:
-    exit("usage: ./Client.py <server_host> <server_port>")
 
-signal.signal(signal.SIGINT, quit)
+if __name__ == "__main__":
+    # Get address and port from command line
+    try:
+        serv_addr = socket.gethostbyname(sys.argv[1])
+        serv_port = int(sys.argv[2])
+    except IndexError, TypeError:
+        exit("usage: ./Client.py <server_host> <server_port>")
 
-try:
+    signal.signal(signal.SIGINT, quit)
+
     while True:
         # Create socket
         # No need for arguments because the defaults,
@@ -37,7 +41,10 @@ try:
         username = raw_input("Username: ")
         password = raw_input("Password: ")
 
-        sock.connect((serv_addr, serv_port))
+        try:
+            sock.connect((serv_addr, serv_port))
+        except socket.error:
+            exit("Connection failed.")
 
         response = sock.recv(4096).split("\n")
         if response[0] != "AUTHENTICATE":
@@ -78,6 +85,3 @@ try:
         except socket.error:
             sock.close()
             exit("Server error.")
-except socket.error:
-    sock.close()
-    exit("Connection failed.")
