@@ -7,6 +7,7 @@ import string
 import sys
 
 LAST_HOUR = datetime.timedelta(hours=1)
+BLOCK_TIME = datetime.timedelta(seconds=60)
 
 # Create dictionary for usernames and passwords
 passwords = dict()
@@ -15,13 +16,13 @@ passwords = dict()
 users = dict()
 
 # Create dictionary for attempt tracking
-attempts = dict()
+last_attempt = dict()
 
 # Keeps track of last time user logged out
 last_activity = dict()
 
-# Create list for blocked users
-blocked = []
+# Create list for block times for users
+block_times = dict()
 
 # Ensure graceful exit on CTRL+C
 def quit(sig_num, status):
@@ -34,31 +35,47 @@ def owner(s):
     return users.keys()[users.values().index(s)]
 
 
+def blocked(address, username):
+    try:
+        time_since_blocked = datetime.datetime.now() - block_times[address][username]
+        if time_since_blocked < BLOCK_TIME:
+            return True
+        else:
+            return False
+    except KeyError:
+        return False
+
+
 def authenticate(client, address):
     ip = address[0]
-    if ip not in blocked:
-        credentials = client.recv(4096)
-        username, password = credentials.strip().split(" ")
-        if username in passwords and passwords[username] == password:
-            if username not in users:
-                users[username] = client
-                attempts[ip] = 0
-                client.send("JOIN\nWelcome to EasyChat!")
-                last_activity[username] = datetime.datetime.now()
+    credentials = client.recv(4096)
+    username, password = credentials.strip().split(" ")
+    if not blocked(ip, username):
+        if username in passwords:
+            if passwords[username] == password:
+                if username not in users:
+                    users[username] = client
+                    client.send("JOIN\nWelcome to EasyChat!")
+                    last_activity[username] = datetime.datetime.now()
+                else:
+                    client.send("WRONG\nUser is already logged in.")
             else:
-                client.send("WRONG\nUser is already logged in.")
+                if ip not in last_attempt or last_attempt[ip][0] != username:
+                    last_attempt[ip] = [username, 1]
+                    client.send("WRONG\nWrong password.")
+                else:
+                    last_attempt[ip][1] += 1
+                    if last_attempt[ip][1] >= 3:
+                        client.send("BLOCK\nToo many wrong attempts. Temporarily blocked.")
+                        if ip not in block_times:
+                            block_times[ip] = dict()
+                        block_times[ip][username] = datetime.datetime.now()
+                    else:
+                        client.send("WRONG\nWrong password.")
         else:
-            if ip in attempts:
-                attempts[ip] += 1
-            else:
-                attempts[ip] = 1
-
-            if attempts[ip] >= 3:
-                blocked.append(ip)
-                attempts[ip] = 0
-                clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.")
-            else:
-                clnt_sock.send("WRONG\nWrong password.")
+            client.send("WRONG\nInvalid username.")
+    else:
+        client.send("BLOCK\nYou are currently blocked. Try again later.")
 
 
 # Send message to all users
@@ -164,8 +181,8 @@ if __name__ == "__main__":
                         elif command == "wholasthr":
                             response = "\nActive in the last hour:"
                             for key in last_activity:
-                                time_since = datetime.datetime.now() - last_activity[key]
-                                if time_since < LAST_HOUR and key != sender:
+                                time_since_active = datetime.datetime.now() - last_activity[key]
+                                if time_since_active < LAST_HOUR and key != sender:
                                     response += "\n" + key + " (at " + str(last_activity[key].time())[:5] + ")"
                             sock.send(response)
 
