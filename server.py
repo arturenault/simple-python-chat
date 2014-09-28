@@ -34,7 +34,13 @@ def quit(sig_num, status):
 def owner(s):
     return users.keys()[users.values().index(s)]
 
+# Check if a user has recently been active
+def recently_active(username):
+    time_since_active = datetime.datetime.now() - last_activity[username]
+    return time_since_active < LAST_HOUR
 
+
+# Check if a user is currently blocked at a given IP address
 def blocked(address, username):
     try:
         time_since_blocked = datetime.datetime.now() - block_times[address][username]
@@ -45,7 +51,7 @@ def blocked(address, username):
     except KeyError:
         return False
 
-
+# Authenticate new users
 def authenticate(client, address):
     ip = address[0]
     credentials = client.recv(4096)
@@ -181,8 +187,7 @@ if __name__ == "__main__":
                         elif command == "wholasthr":
                             response = "\nActive in the last hour:"
                             for key in last_activity:
-                                time_since_active = datetime.datetime.now() - last_activity[key]
-                                if time_since_active < LAST_HOUR and key != sender:
+                                if recently_active(key) and key != sender:
                                     response += "\n" + key + " (at " + str(last_activity[key].time())[:5] + ")"
                             sock.send(response)
 
