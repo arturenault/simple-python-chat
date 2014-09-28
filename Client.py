@@ -73,7 +73,9 @@ if __name__ == "__main__":
                     if messages:
                         print(messages)
                     else:
-                        exit("Server error.")
+                        exit(
+                            "Connection lost.\n"+
+                            "The server may have crashed, or you may have been disconnected due to inactivity.")
                 else:
                     message = sys.stdin.readline()
                     if message.split()[0] == "logout":

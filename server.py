@@ -6,8 +6,10 @@ import socket
 import string
 import sys
 
+# Constant time variables
 LAST_HOUR = datetime.timedelta(hours=1)
 BLOCK_TIME = datetime.timedelta(seconds=60)
+TIME_OUT = datetime.timedelta(minutes=30)
 
 # Create dictionary for usernames and passwords
 passwords = dict()
@@ -24,6 +26,7 @@ last_activity = dict()
 # Create list for block times for users
 block_times = dict()
 
+
 # Ensure graceful exit on CTRL+C
 def quit(sig_num, status):
     print("\nServer terminated.")
@@ -34,10 +37,17 @@ def quit(sig_num, status):
 def owner(s):
     return users.keys()[users.values().index(s)]
 
-# Check if a user has recently been active
-def recently_active(username):
+
+# Check if a user has been logged out in the last hour
+def last_hour(username):
     time_since_active = datetime.datetime.now() - last_activity[username]
     return time_since_active < LAST_HOUR
+
+
+# Check if a user is logged in but idle
+def idle(username):
+    time_since_active = datetime.datetime.now() - last_activity[username]
+    return time_since_active > TIME_OUT and username in users
 
 
 # Check if a user is currently blocked at a given IP address
@@ -50,6 +60,7 @@ def blocked(address, username):
             return False
     except KeyError:
         return False
+
 
 # Authenticate new users
 def authenticate(client, address):
@@ -93,7 +104,7 @@ def broadcast(source, text):
                 users[u].send(text)
             except socket.error:
                 users[u].close()
-                users.remove(u)
+                users.pop(u)
 
 
 # Send private message
@@ -144,13 +155,16 @@ if __name__ == "__main__":
     status = serv_sock.listen(5)
     print("Chat server is listening on port " + str(port))
     while True:
+        for user in last_activity:
+            if idle(user):
+                users[user].close()
+                users.pop(user)
         ready, spam, eggs = select.select(users.values() + [serv_sock], [], [], 0)
         for sock in ready:
             if sock is serv_sock:
                 # Accept new connection
                 (clnt_sock, clnt_addr) = serv_sock.accept()
                 clnt_sock.settimeout(0.1)
-                print("Connection from " + str(clnt_addr))
                 authenticate(clnt_sock, clnt_addr)
             else:
                 try:
@@ -187,7 +201,7 @@ if __name__ == "__main__":
                         elif command == "wholasthr":
                             response = "\nActive in the last hour:"
                             for key in last_activity:
-                                if recently_active(key) and key != sender:
+                                if last_hour(key) and key != sender:
                                     response += "\n" + key + " (at " + str(last_activity[key].time())[:5] + ")"
                             sock.send(response)
 
