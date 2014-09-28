@@ -45,12 +45,7 @@ if __name__ == "__main__":
         except socket.error:
             exit("Connection failed.")
 
-        response = sock.recv(4096).split("\n")
-        if response[0] != "AUTHENTICATE":
-            sock.close()
-            exit("Protocol error")
-
-        sock.send("AUTHENTICATE\n" + username + " " + password)
+        sock.send(username + " " + password)
 
         # Receive welcome message or rejection
         response = sock.recv(4096).split("\n")

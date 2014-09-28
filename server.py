@@ -37,32 +37,28 @@ def owner(s):
 def authenticate(client, address):
     ip = address[0]
     if ip not in blocked:
-        client.send("AUTHENTICATE\n");
-        response = client.recv(4096).split("\n")
-        if response[0] == "AUTHENTICATE":
-            username, password = response[1].strip().split(" ")
-            if username in passwords and passwords[username] == password:
-                if username not in users:
-                    users[username] = client
-                    attempts[ip] = 0
-                    client.send("JOIN\nWelcome to EasyChat!")
-                    last_activity[username] = datetime.datetime.now()
-                else:
-                    client.send("WRONG\n")
+        credentials = client.recv(4096)
+        username, password = credentials.strip().split(" ")
+        if username in passwords and passwords[username] == password:
+            if username not in users:
+                users[username] = client
+                attempts[ip] = 0
+                client.send("JOIN\nWelcome to EasyChat!")
+                last_activity[username] = datetime.datetime.now()
             else:
-                if ip in attempts:
-                    attempts[ip] += 1
-                else:
-                    attempts[ip] = 1
-
-                if attempts[ip] >= 3:
-                    blocked.append(ip)
-                    attempts[ip] = 0
-                    clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.")
-                else:
-                    clnt_sock.send("WRONG\nWrong password.")
+                client.send("WRONG\nUser is already logged in.")
         else:
-            clnt_sock.send("ERROR\nWrong protocol.")
+            if ip in attempts:
+                attempts[ip] += 1
+            else:
+                attempts[ip] = 1
+
+            if attempts[ip] >= 3:
+                blocked.append(ip)
+                attempts[ip] = 0
+                clnt_sock.send("BLOCK\nToo many wrong attempts. Blocked.")
+            else:
+                clnt_sock.send("WRONG\nWrong password.")
 
 
 # Send message to all users
