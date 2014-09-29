@@ -74,6 +74,8 @@ def authenticate(client, address):
                     users[username] = client
                     client.send("JOIN\nWelcome to EasyChat!")
                     last_activity[username] = datetime.datetime.now()
+                    if ip in last_attempt:
+                        last_attempt.pop(ip)
                 else:
                     client.send("WRONG\nUser is already logged in.")
             else:
@@ -87,10 +89,12 @@ def authenticate(client, address):
                         if ip not in block_times:
                             block_times[ip] = dict()
                         block_times[ip][username] = datetime.datetime.now()
+                        last_attempt.pop(ip)
                     else:
                         client.send("WRONG\nWrong password.")
         else:
             client.send("WRONG\nInvalid username.")
+            last_attempt.pop(ip)
     else:
         client.send("BLOCK\nYou are currently blocked. Try again later.")
 
