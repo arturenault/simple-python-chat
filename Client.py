@@ -48,7 +48,7 @@ if __name__ == "__main__":
         sock.send(username + " " + password)
 
         # Receive welcome message or rejection
-        response = sock.recv(4096).split("\n")
+        response = sock.recv(4096).strip().split("\n",1)
 
         if response[0] == "JOIN":
             print(response[1])

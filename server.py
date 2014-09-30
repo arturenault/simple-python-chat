@@ -12,10 +12,10 @@ BLOCK_TIME = datetime.timedelta(seconds=60)
 TIME_OUT = datetime.timedelta(minutes=30)
 
 # Create dictionary for usernames and passwords
-passwords = dict()
+users = dict()
 
 # Create dictionary for socket storage
-users = dict()
+online = dict()
 
 # Create dictionary for attempt tracking
 last_attempt = dict()
@@ -26,6 +26,7 @@ last_activity = dict()
 # Create list for block times for users
 block_times = dict()
 
+offline_messages = dict()
 
 # Ensure graceful exit on CTRL+C
 def quit(sig_num, status):
@@ -35,7 +36,7 @@ def quit(sig_num, status):
 
 # Find user from socket
 def owner(s):
-    return users.keys()[users.values().index(s)]
+    return online.keys()[online.values().index(s)]
 
 
 # Check if a user has been logged out in the last hour
@@ -47,7 +48,7 @@ def last_hour(username):
 # Check if a user is logged in but idle
 def idle(username):
     time_since_active = datetime.datetime.now() - last_activity[username]
-    return time_since_active > TIME_OUT and username in users
+    return time_since_active > TIME_OUT and username in online
 
 
 # Check if a user is currently blocked at a given IP address
@@ -68,14 +69,17 @@ def authenticate(client, address):
     credentials = client.recv(4096)
     username, password = credentials.strip().split(" ")
     if not blocked(ip, username):
-        if username in passwords:
-            if passwords[username] == password:
-                if username not in users:
-                    users[username] = client
-                    client.send("JOIN\nWelcome to EasyChat!")
+        if username in users:
+            if users[username] == password:
+                if username not in online:
+                    online[username] = client
+                    client.send("JOIN\nWelcome to EasyChat!\n")
                     last_activity[username] = datetime.datetime.now()
                     if ip in last_attempt:
                         last_attempt.pop(ip)
+                    if offline_messages[username]:
+                        client.send("Offline messages:" + offline_messages[username] + "\n")
+                        offline_messages[username] = ""
                 else:
                     client.send("WRONG\nUser is already logged in.")
             else:
@@ -103,24 +107,24 @@ def authenticate(client, address):
 def broadcast(source, text):
     text = "\n" + sender + ": " + text
     for u in users:
-        if users[u] is not source:
-            try:
-                users[u].send(text)
-            except socket.error:
-                users[u].close()
-                users.pop(u)
+        if u in online:
+            if online[u] is not source:
+                try:
+                    online[u].send(text)
+                except socket.error:
+                    online[u].close()
+                    online.pop(u)
+        else:
+            offline_messages[u] += text
 
 
 # Send private message
 def message(source, destination, text):
-    try:
-        users[destination].send("\n(private)" + sender + ": " + text)
-    except KeyError:
-        source.send("\nThat user is not logged in.")
-    except socket.error:
-        source.send("\nThat user is not available.")
-        users[dest].close()
-        users.pop(user)
+    formatted_text = "\n" + owner(source) + " (private): " + text
+    if destination in online:
+        online[destination].send(formatted_text)
+    else:
+        offline_messages[destination] += formatted_text
 
 # main method
 if __name__ == "__main__":
@@ -138,8 +142,9 @@ if __name__ == "__main__":
         sys.exit("\"user_pass.txt\" not found.")
     for line in user_file:
         user = string.split(line)
-        passwords[user[0]] = user[1]
+        users[user[0]] = user[1]
         last_activity[user[0]] = datetime.datetime.min
+        offline_messages[user[0]] = ""
 
     # Create socket
     # No parameters needed because Python defaults to
@@ -161,9 +166,9 @@ if __name__ == "__main__":
     while True:
         for user in last_activity:
             if idle(user):
-                users[user].close()
-                users.pop(user)
-        ready, spam, eggs = select.select(users.values() + [serv_sock], [], [], 0)
+                online[user].close()
+                online.pop(user)
+        ready, spam, eggs = select.select(online.values() + [serv_sock], [], [], 0)
         for sock in ready:
             if sock is serv_sock:
                 # Accept new connection
@@ -197,7 +202,7 @@ if __name__ == "__main__":
 
                         elif command == "whoelse":
                             response = "\nLogged in:"
-                            for key in users.keys():
+                            for key in online.keys():
                                 if key != sender:
                                     response += "\n" + key
                             sock.send(response)
@@ -215,9 +220,9 @@ if __name__ == "__main__":
                     else:
                         # If we get here, client is dead. Log him out.
                         sock.close()
-                        users.pop(owner(sock))
+                        online.pop(owner(sock))
 
                 except socket.error:
                     last_activity[owner(sock)] = datetime.datetime.now()
                     sock.close()
-                    users.pop(owner(sock))
+                    online.pop(owner(sock))
