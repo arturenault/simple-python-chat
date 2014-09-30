@@ -13,12 +13,6 @@ def quit(sig_num, status):
     exit(0)
 
 
-# Wait for input from user
-def wait_for_input():
-    sys.stdout.write("> ")
-    sys.stdout.flush()
-
-
 if __name__ == "__main__":
     # Get address and port from command line
     try:
@@ -63,7 +57,6 @@ if __name__ == "__main__":
 
     # If you get here, you are logged in.
     while True:
-        wait_for_input()
         new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
 
         if new_messages:
@@ -71,11 +64,12 @@ if __name__ == "__main__":
                 if source is sock:
                     messages = sock.recv(4096)
                     if messages:
-                        print(messages)
+                        sys.stdout.write(messages)
                     else:
                         exit(
-                            "Connection lost.\n"+
-                            "The server may have crashed, or you may have been disconnected due to inactivity.")
+                            "Connection lost.\n"
+                            "The server may have crashed,"
+                            "or you may have been disconnected due to inactivity.")
                 else:
                     message = sys.stdin.readline()
                     if message.split()[0] == "logout":

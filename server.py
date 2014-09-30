@@ -26,6 +26,7 @@ last_activity = dict()
 # Create list for block times for users
 block_times = dict()
 
+# Create buffers for offline messages
 offline_messages = dict()
 
 # Ensure graceful exit on CTRL+C
@@ -67,18 +68,23 @@ def blocked(address, username):
 def authenticate(client, address):
     ip = address[0]
     credentials = client.recv(4096)
-    username, password = credentials.strip().split(" ")
+    try:
+        username, password = credentials.strip().split(" ")
+    except ValueError:
+        client.send("WRONG\nAuthentication error.")
+        return
     if not blocked(ip, username):
         if username in users:
             if users[username] == password:
                 if username not in online:
                     online[username] = client
-                    client.send("JOIN\nWelcome to EasyChat!\n")
+                    client.send("JOIN\nWelcome to EasyChat!\n"
+                                "--------------------------------------------------------\n")
                     last_activity[username] = datetime.datetime.now()
                     if ip in last_attempt:
                         last_attempt.pop(ip)
                     if offline_messages[username]:
-                        client.send("Offline messages:" + offline_messages[username] + "\n")
+                        client.send("What you missed:\n" + offline_messages[username] + "--------------------------------------------------------\n")
                         offline_messages[username] = ""
                 else:
                     client.send("WRONG\nUser is already logged in.")
@@ -98,14 +104,15 @@ def authenticate(client, address):
                         client.send("WRONG\nWrong password.")
         else:
             client.send("WRONG\nInvalid username.")
-            last_attempt.pop(ip)
+            if ip in last_attempt:
+                last_attempt.pop(ip)
     else:
         client.send("BLOCK\nYou are currently blocked. Try again later.")
 
 
 # Send message to all users
 def broadcast(source, text):
-    text = "\n" + sender + ": " + text
+    text = sender + ": " + text + "\n"
     for u in users:
         if u in online:
             if online[u] is not source:
@@ -120,7 +127,7 @@ def broadcast(source, text):
 
 # Send private message
 def message(source, destination, text):
-    formatted_text = "\n" + owner(source) + " (private): " + text
+    formatted_text = owner(source) + " (private): " + text + "\n"
     if destination in online:
         online[destination].send(formatted_text)
     else:
@@ -180,43 +187,59 @@ if __name__ == "__main__":
                     # Handle new messages
                     data = sock.recv(4096)
                     if data:
-                        sender = owner(sock)
+                        try:
+                            sender = owner(sock)
 
-                        # Update last activity for the user
-                        last_activity[sender] = datetime.datetime.now()
+                            # Update last activity for the user
+                            last_activity[sender] = datetime.datetime.now()
 
-                        l = data.strip("\n").split(" ", 1)
-                        command = l[0]
+                            l = data.strip("\n").split(" ", 1)
+                            command = l[0]
 
-                        # Handle the case where it's there's also a message,
-                        # not just a command.
-                        if len(l) > 1:
-                            text = l[1]
+                            # Handle the case where it's there's also a message,
+                            # not just a command.
+                            if len(l) > 1:
+                                text = l[1]
 
-                        if command == "broadcast":
-                            broadcast(sock, text)
+                            if command == "broadcast":
+                                broadcast(sock, text)
 
-                        elif command == "message":
-                            dest, text = text.split(" ", 1)
-                            message(sock, dest, text)
+                            elif command == "message":
+                                dest, text = text.split(" ", 1)
+                                message(sock, dest, text)
 
-                        elif command == "whoelse":
-                            response = "\nLogged in:"
-                            for key in online.keys():
-                                if key != sender:
-                                    response += "\n" + key
-                            sock.send(response)
+                            elif command == "whoelse":
+                                response = ("Logged in:\n"
+                                            "--------------------------------------------------------\n")
+                                for key in online.keys():
+                                    if key != sender:
+                                        response += key + "\n"
+                                response += "--------------------------------------------------------\n"
+                                sock.send(response)
 
-                        elif command == "wholasthr":
-                            response = "\nActive in the last hour:"
-                            for key in last_activity:
-                                if last_hour(key) and key != sender:
-                                    response += "\n" + key + " (at " + str(last_activity[key].time())[:5] + ")"
-                            sock.send(response)
+                            elif command == "wholasthr":
+                                response = ("Active in the last hour:\n"
+                                            "--------------------------------------------------------\n")
+                                for key in last_activity:
+                                    if last_hour(key) and key != sender:
+                                        response += (key + " (at " + str(last_activity[key].time())[:5] + ")\n")
+                                response += "--------------------------------------------------------\n"
+                                sock.send(response)
 
-                        else:
-                            sock.send("\nCommand not recognized.")
-
+                            elif command == "help":
+                                response = ("Available commands:\n"
+                                            "--------------------------------------------------------\n"
+                                            "whoelse: list other online users\n"
+                                            "wholasthr: list users active in the past hour\n"
+                                            "broadcast <message>: send <message> to all other users\n"
+                                            "message <user> <message>: send <message> to <user>\n"
+                                            "logout: logout of chat\n"
+                                            "--------------------------------------------------------\n")
+                                sock.send(response)
+                            else:
+                                sock.send("Invalid command.\n")
+                        except NameError:
+                            sock.send("Invalid command.\n")
                     else:
                         # If we get here, client is dead. Log him out.
                         sock.close()
