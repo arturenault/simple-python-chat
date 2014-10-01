@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+"""
+Client.py: the client program for EasyChat.
+A simple chat application for CSEE W4119 Computer Networks.
+by Artur Upton Renault (aur2103)
+
+"""
+
 import select
 import signal
 import socket
@@ -39,27 +46,35 @@ if __name__ == "__main__":
         except socket.error:
             exit("Connection failed.")
 
+        # Send authentication info to server.
+        # I chose to send it all at once so the server doesn't
+        # have to wait around for user input.
         sock.send(username + " " + password)
 
         # Receive welcome message or rejection
         response = sock.recv(4096).strip().split("\n",1)
 
+
+        # React accordingly to the response
         if response[0] == "JOIN":
             print(response[1])
-            break
+            break # Welcome to the chat!
         elif response[0] == "WRONG":
             print(response[1])
             sock.close()
-            continue
+            continue # Some sort of authentication error, try again.
         elif response[0] == "BLOCK":
             sock.close()
-            exit(response[1])
+            exit(response[1]) # Blocked. Quit clitn.
 
     # If you get here, you are logged in.
     while True:
+
+        # Check to see if stdin or the socket have new messages ready.
         new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
 
         if new_messages:
+            # print new messages
             for source in new_messages:
                 if source is sock:
                     messages = sock.recv(4096)
@@ -72,6 +87,9 @@ if __name__ == "__main__":
                             "or you may have been disconnected due to inactivity.")
                 else:
                     message = sys.stdin.readline()
+
+                    # logout is the only command handled by the client.
+                    # It behaves exactly like CTRL+C.
                     if message.split()[0] == "logout":
                         quit(0, 0)
                     sock.send(message)
