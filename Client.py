@@ -15,9 +15,14 @@ import sys
 
 # Exit gracefully
 def quit(sig_num, status):
-    print("\nYou have quit the chat.")
+    print("\rYou have quit the chat.")
     sock.close()
     exit(0)
+
+# Prompt user for input
+def prompt():
+    sys.stdout.write("> ")
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":
@@ -69,8 +74,9 @@ if __name__ == "__main__":
 
     # If you get here, you are logged in.
     while True:
-
         # Check to see if stdin or the socket have new messages ready.
+
+        prompt()
         new_messages, spam, eggs = select.select([sys.stdin, sock], [], [])
 
         if new_messages:
@@ -78,11 +84,11 @@ if __name__ == "__main__":
             for source in new_messages:
                 if source is sock:
                     messages = sock.recv(4096)
-                    if messages:
-                        sys.stdout.write(messages)
+                    if messages: # Carriage return to erase prompt
+                        sys.stdout.write("\r" + messages)
                     else:
                         exit(
-                            "Connection lost.\n"
+                            "\rConnection lost.\n"
                             "The server may have crashed,"
                             "or you may have been disconnected due to inactivity.")
                 else:

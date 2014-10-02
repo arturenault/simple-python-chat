@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+
+"""
+Server.py: the server for EasyChat.
+A simple chat application for CSEE W4119 Computer Networks.
+by Artur Upton Renault (aur2103)
+
+"""
+
 import datetime
 import select
 import signal
@@ -77,6 +85,8 @@ def authenticate(client, address):
         if username in users:
             if users[username] == password:
                 if username not in online:
+
+                    # Successful authentication
                     online[username] = client
                     client.send("JOIN\nWelcome to EasyChat!\n"
                                 "--------------------------------------------------------\n")
@@ -84,15 +94,24 @@ def authenticate(client, address):
                     if ip in last_attempt:
                         last_attempt.pop(ip)
                     if offline_messages[username]:
-                        client.send("What you missed:\n" + offline_messages[username] + "--------------------------------------------------------\n")
+                        # Send offline messages
+                        client.send("What you missed:\n" +
+                        offline_messages[username] +
+                        "--------------------------------------------------------\n")
                         offline_messages[username] = ""
                 else:
+
+                    # Prevent concurrent duplicate users
                     client.send("WRONG\nUser is already logged in.")
             else:
                 if ip not in last_attempt or last_attempt[ip][0] != username:
+
+                    # Keep track of last failed attempt by this ip address
                     last_attempt[ip] = [username, 1]
                     client.send("WRONG\nWrong password.")
                 else:
+
+                    # Block users
                     last_attempt[ip][1] += 1
                     if last_attempt[ip][1] >= 3:
                         client.send("BLOCK\nToo many wrong attempts. Temporarily blocked.")
@@ -112,17 +131,20 @@ def authenticate(client, address):
 
 # Send message to all users
 def broadcast(source, text):
-    text = sender + ": " + text + "\n"
+    formatted_text = sender + ": " + text + "\n"
     for u in users:
         if u in online:
             if online[u] is not source:
                 try:
-                    online[u].send(text)
+                    online[u].send(formatted_text)
                 except socket.error:
                     online[u].close()
                     online.pop(u)
         else:
-            offline_messages[u] += text
+            offline_messages[u] += ("(" +
+                                    str(datetime.datetime.now().time())[:5] +
+                                    ") " +
+                                    formatted_text)
 
 
 # Send private message
@@ -131,7 +153,10 @@ def message(source, destination, text):
     if destination in online:
         online[destination].send(formatted_text)
     else:
-        offline_messages[destination] += formatted_text
+        offline_messages[destination] += ("(" +
+                        str(datetime.datetime.now().time())[:5] +
+                        ") " +
+                        formatted_text)
 
 # main method
 if __name__ == "__main__":
@@ -148,6 +173,8 @@ if __name__ == "__main__":
     except IOError:
         sys.exit("\"user_pass.txt\" not found.")
     for line in user_file:
+
+        # Initialize all info about users
         user = string.split(line)
         users[user[0]] = user[1]
         last_activity[user[0]] = datetime.datetime.min
@@ -169,7 +196,9 @@ if __name__ == "__main__":
 
     # Set socket to listen
     status = serv_sock.listen(5)
-    print("Chat server is listening on port " + str(port))
+    print("Chat server is listening at " +
+          socket.gethostbyname(socket.gethostname()) +
+          ":" + str(port))
     while True:
         for user in last_activity:
             if idle(user):
@@ -193,15 +222,19 @@ if __name__ == "__main__":
                             # Update last activity for the user
                             last_activity[sender] = datetime.datetime.now()
 
-                            l = data.strip("\n").split(" ", 1)
-                            command = l[0]
+                            list = data.strip("\n").split(" ", 1)
+                            command = list[0]
+                            command = command.lower()
 
                             # Handle the case where it's there's also a message,
                             # not just a command.
-                            if len(l) > 1:
-                                text = l[1]
+                            text = ""
+                            if len(list) > 1:
+                                text = list[1]
 
                             if command == "broadcast":
+                                if not text:
+                                    raise ValueError
                                 broadcast(sock, text)
 
                             elif command == "message":
@@ -226,26 +259,49 @@ if __name__ == "__main__":
                                 response += "--------------------------------------------------------\n"
                                 sock.send(response)
 
+                            elif command == "lastseen":
+                                response = ("Time last seen:\n"
+                                            "--------------------------------------------------------\n")
+                                for user in last_activity:
+                                    if last_activity[user] != datetime.datetime.min and user != owner(sock):
+                                        response += user + ": " + str(last_activity[user].time())[:5] + "\n"
+                                    else:
+                                        response += user + ": never\n"
+                                response += "--------------------------------------------------------\n"
+                                sock.send(response)
                             elif command == "help":
+
+                                # Help menu
                                 response = ("Available commands:\n"
                                             "--------------------------------------------------------\n"
                                             "whoelse: list other online users\n"
                                             "wholasthr: list users active in the past hour\n"
+                                            "lastseen: prints time at which users were last seen\n"
                                             "broadcast <message>: send <message> to all other users\n"
                                             "message <user> <message>: send <message> to <user>\n"
                                             "logout: logout of chat\n"
+                                            "help: get list of available commands\n"
                                             "--------------------------------------------------------\n")
                                 sock.send(response)
                             else:
+
+                                # Unrecognized command.
                                 sock.send("Invalid command.\n")
-                        except NameError:
+
+                        except ValueError:
+                            # Handle the case where a user sends a command with a missing message,
+                            # e.g. "broadcast"
                             sock.send("Invalid command.\n")
+                        except KeyError:
+                            # Invalid username
+                            sock.send("Invalid user.\n")
                     else:
                         # If we get here, client is dead. Log him out.
                         sock.close()
                         online.pop(owner(sock))
 
                 except socket.error:
+                    # Handle all problems with user sockets: just log them out.
                     last_activity[owner(sock)] = datetime.datetime.now()
                     sock.close()
                     online.pop(owner(sock))
